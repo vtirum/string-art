@@ -82,8 +82,10 @@ def get_next_pin(current_pin, previous_pin, canvas_flat):
     best_diff = float('inf')
     best_pin = None
 
-    for (curr, pin) in connections:
+    for _, pin in connections:
         if pin == previous_pin:
+            continue
+        if (current_pin, pin) in recent_connections or (pin, current_pin) in recent_connections:
             continue
         pixels = get_line_pixels(pins[current_pin], pins[pin])
         w_diff = get_line_diff(pixels, 1.0, canvas_flat, y_flat)
@@ -123,12 +125,13 @@ y_flat = y.flatten()
 m = len(y_flat)
 radius = img.shape[0] // 2
 
-num_pins = 100 
-num_lines = 2000
+num_pins = 200 
+num_lines = 5000
 start_pin = 0
 pins = []
-pin_sequence = [(start_pin, 1.0)]
+pin_sequence = [(start_pin, 0.0)]
 line_cache = {}
+recent_connections = set()
 
 pins = generate_circle_pins(num_pins, radius)
 canvas = np.full_like(img, 0.5, dtype=np.float32)
@@ -142,6 +145,9 @@ for t in tqdm(range(num_lines)):
     current_pin = pin_sequence[-1][0]
     previous_pin = pin_sequence[-2][0] if len(pin_sequence) > 1 else None
     next_pin, color = get_next_pin(current_pin, previous_pin, canvas_flat)
+    recent_connections.add((current_pin, next_pin))
+    if len(recent_connections) > 20:
+        recent_connections.pop()
 
     pixels = get_line_pixels(pins[current_pin], pins[next_pin])
     for x, y in pixels:
