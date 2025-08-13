@@ -1,57 +1,76 @@
 import cv2 
 import numpy as np  
+import requests
 
 
 def nothing(x): pass
 
 # read in image
-image = cv2.imread('lucki.png') 
+'''
+url = "https://photos.fife.usercontent.google.com/pw/AP1GczOnQp_fvF2jubmdnxONyOjp0UsaTJbzeyJzKhHE2Lvcn8NVRTVxlQSC=w519-h923-s-no-gm?authuser=1"
+resp = requests.get(url)
+img_array = np.asarray(bytearray(resp.content), dtype=np.uint8)
+image = cv2.imdecode(img_array, cv2.IMREAD_COLOR_BGR)
+'''
+image = cv2.imread('PXL_20240601_044143906.MP.jpg') 
+
+preview = None
+
+if len(image.shape) == 3:
+    preview = cv2.cvtColor(image.copy(), cv2.COLOR_BGR2GRAY)
+else:
+    preview = image.copy()
+
+height, width = preview.shape
 
 # set window size
 size = 600 
 cv2.namedWindow('image', cv2.WINDOW_NORMAL)
-cv2.resizeWindow('image', size, size)
+cv2.resizeWindow('image', width, height)
 
-height, width = image.shape[:2]
-r = min(height, width) // 2
+max_radius = min(width, height) // 2
+initial_radius = max_radius // 2
+cv2.createTrackbar('Radius', 'image', initial_radius, max_radius, nothing)
 
-# create trackbars for center position
-cv2.createTrackbar('Center Y', 'image', (height - 2 * r) // 2, height - 2 * r, nothing)
+cv2.createTrackbar('Center X', 'image', width // 2, width, nothing)
+
+cv2.createTrackbar('Center Y', 'image', height // 2, height, nothing)
 
 while True:
-    cx = r
-    cy = cv2.getTrackbarPos('Center Y', 'image') + r
+    radius = cv2.getTrackbarPos('Radius', 'image')
+    center_x = cv2.getTrackbarPos('Center X', 'image')
+    center_y = cv2.getTrackbarPos('Center Y', 'image')
 
-    # preview grayscale image with circle 
-    preview = cv2.cvtColor(image.copy(), cv2.COLOR_BGR2GRAY)
-    cv2.circle(preview, (cx, cy), r, 255, 2)
+    min_x = radius
+    max_x = width - radius
+    center_x = max(min_x, min(center_x, max_x))
+    cv2.setTrackbarPos('Center X', 'image', center_x)
+
+    min_y = radius
+    max_y = height - radius
+    center_y = max(min_y, min(center_y, max_y))
+    cv2.setTrackbarPos('Center Y', 'image', center_y)
+
+    display = preview.copy()
+
+    mask = np.zeros_like(preview)
+    cv2.circle(mask, (center_x, center_y), radius, 255, -1)
+    result = cv2.bitwise_and(display, mask)
+
+    cv2.circle(result, (center_x, center_y), radius, 2)
     
-    cv2.imshow('image', preview)
+    cv2.imshow('image', result)
 
     key = cv2.waitKey(1) & 0xFF
-    if key == 13:  # enter key
+    if key == ord('q'):
         break
-    elif key == 27:  # esc key
-        exit()
+    elif key == ord('s'):
+        cropped = cv2.bitwise_and(preview, mask)
+        cropped = cropped[center_y - radius:center_y + radius, 
+                  center_x - radius:center_x + radius]
+        cv2.imwrite('cookie.png', cropped)
+
 cv2.destroyAllWindows()
+        
 
-# create mask with circle
-mask = np.zeros((height, width), dtype=np.uint8)
-mask = cv2.circle(mask, (cx, cy), r, 255, -1)
-mask = cv2.resize(mask, image.shape[1::-1])
 
-# apply mask to image
-result = cv2.bitwise_and(image, image, mask=mask)
-result = cv2.cvtColor(result, cv2.COLOR_BGR2GRAY)
-
-#crop the result to the circle area
-result = result[cy - r:cy + r, cx - r:cx + r]
-
-cv2.namedWindow('result', cv2.WINDOW_NORMAL)
-cv2.resizeWindow('result', size, size)
-cv2.imshow('result', result)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-# save the cropped image
-cv2.imwrite('cropped_image.png', result)

@@ -42,7 +42,7 @@ def bresenham_line(x0, y0, x1, y1):
             y0 += sy
     return pixels
 
-def get_next_pin(current_pin, err_w, err_b, line_weight):
+def get_next_pin(current_pin):
     best_pin = None
     best_color = None
     best_pixels = None
@@ -62,6 +62,7 @@ def get_next_pin(current_pin, err_w, err_b, line_weight):
             for x, y in pixels:
                 if 0 <= x < width and 0 <= y < height:
                     idx = y * width + x
+                    #dark_weight = 1.0 + (y_flat[idx] * 2.0) 
                     if color == 1.0:
                         total_err += err_w[idx]
                     else:
@@ -79,6 +80,7 @@ def get_next_pin(current_pin, err_w, err_b, line_weight):
     for x, y in best_pixels:
         if 0 <= x < width and 0 <= y < height:
             idx = y * width + x
+            #dark_weight = 1.0 + (y_flat[idx] * 1.5)
             if best_color == 1.0:
                 err_w[idx] = max(0.0, err_w[idx] - line_weight)
             else:
@@ -86,7 +88,6 @@ def get_next_pin(current_pin, err_w, err_b, line_weight):
 
     return best_pin, best_color
     
-
 def export_svg(filename, pins, pin_sequence, width, height):
     xs = [p[0] for p in pins]
     ys = [p[1] for p in pins]
@@ -141,20 +142,26 @@ resp = requests.get(url)
 img_array = np.asarray(bytearray(resp.content), dtype=np.uint8)
 img = cv2.imdecode(img_array, cv2.IMREAD_GRAYSCALE)
 
+# img = cv2.imread('cookie.png', cv2.IMREAD_GRAYSCALE)
+
+'''
+img = cv2.equalizeHist(img)
+img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
+'''
 y = 1.0 - img.astype(np.float32) / 255.0
 height, width = y.shape
 y = (y - y.min()) / (y.max() - y.min()) 
 y_flat = y.flatten()
 
-err_w = (1.0 - y_flat).copy()
-err_b = y_flat.copy()
+err_w = np.array((1.0 - y_flat).copy())
+err_b = np.array(y_flat.copy())
 
 radius = img.shape[0] // 2
 
-num_pins = 200 
-num_lines = 3000
+num_pins = 300 
+num_lines = 5000
 start_pin = 0
-line_weight = 0.5 / ((num_lines * 200) / (height * width)) # ~0.2
+line_weight = 0.5 / ((num_lines * 200) / (height * width)) 
 
 pins = generate_circle_pins(num_pins, radius)
 pin_sequence = [(start_pin, 0.0)]
@@ -162,17 +169,15 @@ line_cache = {}
 recent_connections = []
 
 for t in tqdm(range(num_lines)):
-    '''progress = t / num_lines
-    current_weight = 0.25 * (1.0 - 0.8 * progress)'''
     current_pin = pin_sequence[-1][0]
-    next_pin, color = get_next_pin(current_pin, err_w, err_b, line_weight)
+    next_pin, color = get_next_pin(current_pin)
     
     if next_pin is None:
         break
 
     recent_connections.append(current_pin)
-    if len(recent_connections) > 20:
+    if len(recent_connections) > 10:
         recent_connections.pop(0)
     pin_sequence.append((next_pin, color))
 
-export_svg('final_image_vector.svg', pins, pin_sequence, width=800, height=800)
+export_svg('skull_1.svg', pins, pin_sequence, width=1500, height=1500)
