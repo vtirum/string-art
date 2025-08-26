@@ -7,7 +7,7 @@ def nothing(x): pass
 
 # read in image
 '''
-url = "https://photos.fife.usercontent.google.com/pw/AP1GczOnQp_fvF2jubmdnxONyOjp0UsaTJbzeyJzKhHE2Lvcn8NVRTVxlQSC=w519-h923-s-no-gm?authuser=1"
+url = "" # insert image url
 resp = requests.get(url)
 img_array = np.asarray(bytearray(resp.content), dtype=np.uint8)
 image = cv2.imdecode(img_array, cv2.IMREAD_COLOR_BGR)
