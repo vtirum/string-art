@@ -87,7 +87,60 @@ def get_next_pin(current_pin):
                 err_b[idx] = max(0.0, err_b[idx] - line_weight)
 
     return best_pin, best_color
+
+def get_next_pin_alt(current_pin):
+    best_pin = None
+    best_color = None
+    max_err = -1
+
+    valid_pins = np.ones(num_pins, dtype=bool)
+    valid_pins[list(recent_connections)] = False
+    valid_pins[current_pin] = False
+
+    possible_pins = np.where(valid_pins)[0]
+
+    for new_pin in possible_pins:
+        pixels = get_line_pixels(pins[current_pin], pins[new_pin])
+        if not pixels: 
+            continue
+
+        xs, ys = zip(*pixels)
+        indices = np.array(ys) * width + np.array(xs)
+
+        mask = (0 <= np.array(xs)) & (np.array(xs) < width) & (0 <= np.array(ys)) & (np.array(ys) < height)
+        valid_indices = indices[mask]
+
+        if len(valid_indices) == 0:
+            continue
+
+        total_err_w = np.sum(err_w[valid_indices])
+        total_err_b = np.sum(err_b[valid_indices])
+
+        if total_err_w > max_err:
+            max_err = total_err_w
+            best_pin = new_pin
+            best_color = 1.0
+        if total_err_b > max_err:
+            max_err = total_err_b
+            best_pin = new_pin
+            best_color = 0.0
+
+    if best_pin is None:
+        return None, None
     
+    pixels = get_line_pixels(pins[current_pin], pins[best_pin])
+    xs, ys = zip(*pixels)
+    indices = np.array(ys) * width + np.array(xs)
+    mask = (0 <= np.array(xs)) & (np.array(xs) < width) & (0 <= np.array(ys)) & (np.array(ys) < height)
+    valid_indices = indices[mask]
+
+    if best_color == 1.0:
+        err_w[valid_indices] = np.maximum(0.0, err_w[valid_indices] - line_weight)
+    else:
+        err_b[valid_indices] = np.maximum(0.0, err_b[valid_indices] - line_weight)
+
+    return best_pin, best_color
+
 def export_svg(filename, pins, pin_sequence, width, height):
     xs = [p[0] for p in pins]
     ys = [p[1] for p in pins]
@@ -104,7 +157,7 @@ def export_svg(filename, pins, pin_sequence, width, height):
     def transform(x, y):
         tx = (x - min_x) * scale + margin
         ty = (y - min_y) * scale + margin
-        return int(tx), int(ty) #try with no int
+        return int(tx), int(ty) 
     
     svg_root = Element('svg', xmlns="http://www.w3.org/2000/svg",
                        width=str(width), height=str(height),
@@ -137,17 +190,16 @@ def export_svg(filename, pins, pin_sequence, width, height):
     ElementTree(svg_root).write(filename)
 
 
-url = "https://github.com/usedhondacivic/string-art-gen/blob/main/example.png?raw=true"
-resp = requests.get(url)
-img_array = np.asarray(bytearray(resp.content), dtype=np.uint8)
-img = cv2.imdecode(img_array, cv2.IMREAD_GRAYSCALE)
+url = None
+filename = 'cookie/cookie.png'
+if url is not None and filename is not None:
+    resp = requests.get(url)
+    img_array = np.asarray(bytearray(resp.content), dtype=np.uint8)
+    img = cv2.imdecode(img_array, cv2.IMREAD_GRAYSCALE)
+else:
+    img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
 
-# img = cv2.imread('cookie.png', cv2.IMREAD_GRAYSCALE)
 
-'''
-img = cv2.equalizeHist(img)
-img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
-'''
 y = 1.0 - img.astype(np.float32) / 255.0
 height, width = y.shape
 y = (y - y.min()) / (y.max() - y.min()) 
@@ -180,4 +232,8 @@ for t in tqdm(range(num_lines)):
         recent_connections.pop(0)
     pin_sequence.append((next_pin, color))
 
-export_svg('skull_1.svg', pins, pin_sequence, width=1500, height=1500)
+export_svg('cookie/cookie_1.svg', pins, pin_sequence, width=1500, height=1500)
+
+with open('cookie/cookie_pin_seq.txt', 'w') as f:
+    for pin, color in pin_sequence:
+        f.write(f"{pin} {color}\n")
